@@ -6,7 +6,9 @@
   "scripts": {
     "test": "vitest run",
     "dev": "tsx watch src/index.ts",
-    "worker": "tsx src/worker/worker.ts"
+    "worker": "tsx src/worker/worker.ts",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc"
   },
   "keywords": [],
   "author": "",

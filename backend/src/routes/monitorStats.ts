@@ -8,7 +8,8 @@ export const monitorStatsRouter = Router();
 monitorStatsRouter.use(authMiddleware);
 
 // Helper: parse ID from URL params
-function parseId(param: string): number | null {
+function parseId(param: string | string[] | undefined): number | null {
+  if (!param || Array.isArray(param)) return null;
   const id = parseInt(param, 10);
   return Number.isNaN(id) ? null : id;
 }
