@@ -10,14 +10,13 @@ import { Settings } from "./components/Settings";
 
 export function App() {
   const [user, setUser] = useState<User | null>(null);
-  const [initializing, setInitializing] = useState(true);
+  const [initializing, setInitializing] = useState(() => Boolean(getToken()));
   const [currentView, setCurrentView] = useState<"dashboard" | "add-monitor" | "monitor-detail" | "settings">("dashboard");
   const [selectedMonitorId, setSelectedMonitorId] = useState<number | null>(null);
 
   useEffect(() => {
     const token = getToken();
     if (!token) {
-      setInitializing(false);
       return;
     }
 

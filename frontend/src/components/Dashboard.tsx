@@ -16,44 +16,50 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSelectMonitor, onAddMoni
   const [monitors, setMonitors] = useState<MonitorSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  const fetchMonitors = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const res = await getMonitors();
-      const list = res.monitors;
-
-      // Fetch uptime & incident status in parallel for each monitor
-      const enriched = await Promise.all(
-        list.map(async (m) => {
-          try {
-            const [uptimeRes, incidentRes] = await Promise.all([
-              getMonitorUptime(m.id, 30),
-              getMonitorOpenIncident(m.id),
-            ]);
-            return {
-              ...m,
-              uptimePercentage: uptimeRes.uptimePercentage,
-              isOpenIncident: incidentRes.incident !== null,
-            };
-          } catch {
-            return m;
-          }
-        })
-      );
-
-      setMonitors(enriched);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to load monitors");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
-    fetchMonitors();
-  }, []);
+    let isMounted = true;
+
+    getMonitors()
+      .then(async (res) => {
+        const enriched = await Promise.all(
+          res.monitors.map(async (m) => {
+            try {
+              const [uptimeRes, incidentRes] = await Promise.all([
+                getMonitorUptime(m.id, 30),
+                getMonitorOpenIncident(m.id),
+              ]);
+              return {
+                ...m,
+                uptimePercentage: uptimeRes.uptimePercentage,
+                isOpenIncident: incidentRes.incident !== null,
+              };
+            } catch {
+              return m;
+            }
+          })
+        );
+        if (isMounted) {
+          setMonitors(enriched);
+          setError(null);
+        }
+      })
+      .catch((err: unknown) => {
+        if (isMounted) {
+          setError(err instanceof Error ? err.message : "Failed to load monitors");
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [refreshKey]);
 
   const handleDelete = async (id: number, name: string) => {
     if (!window.confirm(`Are you sure you want to delete monitor "${name}"?`)) {
@@ -87,7 +93,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ onSelectMonitor, onAddMoni
       <div className="max-w-6xl mx-auto px-4 py-8">
         <div className="p-4 bg-rose-50 border border-rose-200 text-rose-700 text-sm rounded-lg flex justify-between items-center">
           <span>{error}</span>
-          <button onClick={fetchMonitors} className="underline font-medium">Retry</button>
+          <button
+            onClick={() => {
+              setLoading(true);
+              setRefreshKey((k) => k + 1);
+            }}
+            className="underline font-medium"
+          >
+            Retry
+          </button>
         </div>
       </div>
     );
