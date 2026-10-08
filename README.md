@@ -2,13 +2,9 @@
 
 A self-hosted HTTP uptime monitor and incident alert system with automated health checks, a PostgreSQL time-series log, and a React dashboard.
 
----
-
 ## What It Does
 
 A user registers an account and adds website or API URLs with a check interval (60s, 1h, or 24h). A background worker pings each active URL on schedule, measuring response time and HTTP status codes. When a service fails or times out, the system opens an incident and sends a single down alert. Subsequent failures log check results without repeating alerts. When the target responds with a 2xx status code again, the incident is closed and a recovery alert is dispatched.
-
----
 
 ## Status
 
@@ -28,8 +24,6 @@ A user registers an account and adds website or API URLs with a check interval (
 - [ ] Email (SMTP) and SMS alert channels
 - [ ] SSL certificate expiration tracking
 
----
-
 ## Architecture
 
 ```mermaid
@@ -43,16 +37,12 @@ flowchart TD
     Worker -->|Send alert| Telegram["Telegram Bot / Console"]
 ```
 
----
-
 ## Tech Stack
 
 - **Backend:** Node.js, Express, TypeScript, pg, BullMQ, ioredis, Zod, bcrypt, jsonwebtoken
 - **Frontend:** React 19, Vite, TypeScript, Tailwind CSS
 - **Databases:** PostgreSQL 16, Redis 7
 - **Testing:** Vitest
-
----
 
 ## How It Works
 
@@ -67,8 +57,6 @@ Health checks follow a strict decision table evaluated inside a PostgreSQL trans
 
 **Health Rule:** Any HTTP 2xx status code (redirects followed) is **UP**. Any other status code (4xx, 5xx) or lack of response (timeout, connection refused, DNS error) is **DOWN**.
 
----
-
 ## Database
 
 - `users`: Account credentials and notification settings (`id`, `name`, `email`, `password_hash`, `telegram_chat_id`, `created_at`).
@@ -77,38 +65,21 @@ Health checks follow a strict decision table evaluated inside a PostgreSQL trans
 - `incidents`: Outage periods (`id`, `monitor_id`, `started_at`, `ended_at`).
 - **Composite Index:** `idx_check_results_monitor_time ON check_results(monitor_id, checked_at)` speeds up monitor history queries. On a test database seeded with 1,000,000 rows across 100 monitors, running `EXPLAIN (ANALYZE, BUFFERS)` on a 24-hour history query dropped execution time from **67.85 ms** (sequential scan across ~999,648 rows) to **5.62 ms** (bitmap index scan reading 351 matching rows).
 
----
-
 ## Run It Locally
 
 ### Docker Compose (Full Stack)
-
 ```bash
-# 1. Start all services
 docker compose up --build -d
-
-# 2. Verify API health
 curl http://localhost:3000/health
 ```
 
 ### Local Development
-
 ```bash
-# 1. Start Postgres and Redis
 docker compose up -d db redis
-
-# 2. Start API server
 cd backend && cp ../.env.example .env && npm install && npm run dev
-
-# 3. Start background worker (separate terminal)
-cd backend && npm run worker
-
-# 4. Start frontend (separate terminal)
+cd backend && npm run worker   # In a separate terminal
 cd frontend && cp .env.example .env && npm install && npm run dev
-# Open http://localhost:5173
 ```
-
----
 
 ## API Endpoints
 
@@ -129,8 +100,6 @@ cd frontend && cp .env.example .env && npm install && npm run dev
 | `GET` | `/monitors/:id/open-incident` | Yes | Get active outage if any |
 | `GET` | `/monitors/:id/uptime` | Yes | Calculate uptime percentage (`?days=30`) |
 
----
-
 ## Environment Variables
 
 | Variable | Default Value | Description |
@@ -144,16 +113,12 @@ cd frontend && cp .env.example .env && npm install && npm run dev
 | `TELEGRAM_BOT_TOKEN` | *(empty)* | Optional Telegram Bot API token |
 | `VITE_API_URL` | `http://localhost:3000` | Backend API URL for frontend |
 
----
-
 ## Known Limitations
 
 - **Single Probe Region:** All checks run from the host machine running the worker.
 - **Unpartitioned Telemetry:** `check_results` is a single table without partitioning.
 - **Alert Channels:** Alerts support Telegram and console output; email (SMTP) and SMS are not implemented.
 - **Protocol Support:** HTTP/HTTPS GET checks only; ICMP ping and SSL certificate monitoring are not supported.
-
----
 
 ## Author
 
