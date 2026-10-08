@@ -2,11 +2,12 @@
 DROP TABLE IF EXISTS incidents, check_results, monitors, users CASCADE;
 
 CREATE TABLE users (
-  id            SERIAL PRIMARY KEY,
-  name          VARCHAR(50)  NOT NULL,
-  email         VARCHAR(255) NOT NULL UNIQUE,
-  password_hash TEXT         NOT NULL,
-  created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+  id               SERIAL PRIMARY KEY,
+  name             VARCHAR(50)  NOT NULL,
+  email            VARCHAR(255) NOT NULL UNIQUE,
+  password_hash    TEXT         NOT NULL,
+  telegram_chat_id TEXT,
+  created_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE monitors (
