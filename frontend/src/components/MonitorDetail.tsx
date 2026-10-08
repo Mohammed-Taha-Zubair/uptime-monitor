@@ -21,35 +21,40 @@ export const MonitorDetail: React.FC<MonitorDetailProps> = ({ monitorId, onBack 
   const [uptime, setUptime] = useState<UptimeStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  const loadData = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const [mRes, cRes, incRes, openIncRes, upRes] = await Promise.all([
-        getMonitor(monitorId),
-        getMonitorChecks(monitorId, 50),
-        getMonitorIncidents(monitorId),
-        getMonitorOpenIncident(monitorId),
-        getMonitorUptime(monitorId, 30),
-      ]);
-
-      setMonitor(mRes.monitor);
-      setChecks(cRes.checks);
-      setIncidents(incRes.incidents);
-      setOpenIncident(openIncRes.incident);
-      setUptime(upRes);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to load monitor details");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
-    loadData();
-  }, [monitorId]);
+    let isMounted = true;
+
+    Promise.all([
+      getMonitor(monitorId),
+      getMonitorChecks(monitorId, 50),
+      getMonitorIncidents(monitorId),
+      getMonitorOpenIncident(monitorId),
+      getMonitorUptime(monitorId, 30),
+    ])
+      .then(([mRes, cRes, incRes, openIncRes, upRes]) => {
+        if (!isMounted) return;
+        setMonitor(mRes.monitor);
+        setChecks(cRes.checks);
+        setIncidents(incRes.incidents);
+        setOpenIncident(openIncRes.incident);
+        setUptime(upRes);
+        setError(null);
+      })
+      .catch((err: unknown) => {
+        if (!isMounted) return;
+        setError(err instanceof Error ? err.message : "Failed to load monitor details");
+      })
+      .finally(() => {
+        if (!isMounted) return;
+        setLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [monitorId, refreshKey]);
 
   if (loading) {
     return (
@@ -121,7 +126,10 @@ export const MonitorDetail: React.FC<MonitorDetailProps> = ({ monitorId, onBack 
         </div>
 
         <button
-          onClick={loadData}
+          onClick={() => {
+            setLoading(true);
+            setRefreshKey((k) => k + 1);
+          }}
           className="px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50"
         >
           Refresh Data
