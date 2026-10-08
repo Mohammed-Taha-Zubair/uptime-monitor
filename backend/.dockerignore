@@ -5,8 +5,4 @@ dist
 .env.*
 !.env.example
 .git
-.gitignore
 *.log
-docs
-.vscode
-.idea

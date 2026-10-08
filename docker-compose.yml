@@ -1,7 +1,8 @@
 services:
   db:
-    image: postgres:16
+    image: postgres:16-alpine
     container_name: uptime-db
+    restart: unless-stopped
     environment:
       POSTGRES_USER: uptime
       POSTGRES_PASSWORD: uptime_dev_pw
@@ -10,6 +11,29 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U uptime -d uptime_monitor"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: uptime-api
+    restart: unless-stopped
+    environment:
+      PORT: 3000
+      DATABASE_URL: postgres://uptime:uptime_dev_pw@db:5432/uptime_monitor
+      ENABLE_INTERNAL_WORKER: "true"
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
 
 volumes:
   pgdata:

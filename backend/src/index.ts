@@ -1,33 +1,69 @@
 import "dotenv/config";
 import express from "express";
+import { config } from "./config";
 import { pool } from "./db";
+import { healthRouter } from "./routes/health.router";
+import { monitorsRouter } from "./routes/monitors.router";
+import { incidentsRouter } from "./routes/incidents.router";
+import { errorHandler } from "./middlewares/errorHandler";
+import { startProbeWorkerLoop, stopProbeWorker } from "./worker/probeWorker";
 
 const app = express();
+
+// Core Middleware
 app.use(express.json());
 
-app.get("/health", async (_req, res) => {
-  const result = await pool.query("SELECT NOW() AS now");
-  res.json({ status: "ok", dbTime: result.rows[0].now });
+// Request logging in development
+if (process.env.NODE_ENV !== "production") {
+  app.use((req, _res, next) => {
+    console.log(`[HTTP] ${req.method} ${req.path}`);
+    next();
+  });
+}
+
+// Modular REST API Routes
+app.use("/health", healthRouter);
+app.use("/monitors", monitorsRouter);
+app.use("/incidents", incidentsRouter);
+
+// 404 Handler
+app.use((_req, res) => {
+  res.status(404).json({ error: "Endpoint not found" });
 });
 
-app.get("/monitors/:id/open-incident", async (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  if (Number.isNaN(id)) {
-    res.status(400).json({ error: "Monitor id must be a number" });
-    return;
+// Global Error Handler
+app.use(errorHandler);
+
+// Server startup
+const server = app.listen(config.port, () => {
+  console.log(`🚀 Uptime Monitor API running on http://localhost:${config.port}`);
+
+  if (config.enableInternalWorker) {
+    console.log("⚡ Starting internal probe worker scheduler...");
+    startProbeWorkerLoop().catch((err) => {
+      console.error("Internal probe worker failed:", err);
+    });
   }
-
-  try {
-    const result = await pool.query(
-      "select * from incidents WHERE monitor_id = $1 AND ended_at IS NULL",
-      [id],
-    );
-    res.status(200).json({ incidents: result.rows[0] ?? null });
-  } catch (error) {
-    return res.status(500).json({ error: "Internal server error" });
-  }
 });
 
-app.listen(process.env.PORT, () => {
-  console.log(`API running on port ${process.env.PORT}`);
-});
+// Graceful Shutdown
+const shutdown = async (signal: string) => {
+  console.log(`\n[Server] ${signal} signal received: closing HTTP server and pool...`);
+  stopProbeWorker();
+  server.close(async () => {
+    console.log("[Server] HTTP server closed.");
+    try {
+      await pool.end();
+      console.log("[Server] Database connection pool drained.");
+      process.exit(0);
+    } catch (err) {
+      console.error("[Server] Error closing pool:", err);
+      process.exit(1);
+    }
+  });
+};
+
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
+
+export { app };
